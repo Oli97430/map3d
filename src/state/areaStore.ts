@@ -1,28 +1,23 @@
 import { create } from "zustand";
+import type { Building, LatLng } from "@/types/overpass";
 
-type AreaStore = {
-  areas: any;
-  center: {
-    lat: number;
-    lng: number;
-  }[];
+interface AreaStore {
+  areas: Building[];
+  center: LatLng[];
+  appendAreas: (areas: Building[]) => void;
+  setCenter: (center: LatLng[]) => void;
+  reset: () => void;
+}
 
-  appendAreas: (areas: any[]) => void;
-  setCenter: (center: any[]) => void;
-};
+const DEFAULT_CENTER: LatLng[] = [
+  { lat: 40.8, lng: -73.95 },
+  { lat: 40.83, lng: -73.88 },
+];
 
 export const useAreaStore = create<AreaStore>((set) => ({
   areas: [],
-  center: [
-    {
-      lat: 40.8,
-      lng: -73.95,
-    },
-    {
-      lat: 40.83,
-      lng: -73.88,
-    },
-  ],
-  appendAreas: (areas) => set(() => ({ areas: [...areas] })),
-  setCenter: (center) => set(() => ({ center: [...center] })),
+  center: DEFAULT_CENTER,
+  appendAreas: (areas) => set({ areas: [...areas] }),
+  setCenter: (center) => set({ center: [...center] }),
+  reset: () => set({ areas: [], center: DEFAULT_CENTER }),
 }));

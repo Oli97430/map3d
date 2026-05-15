@@ -1,508 +1,250 @@
-import { useEffect, useState } from "react";
-import { Canvas, extend, ReactThreeFiber, useThree } from "@react-three/fiber";
-import { useAreaStore } from "@/state/areaStore";
-import { Html, Sky, Environment, Line } from "@react-three/drei";
+import { useEffect, useMemo, useState } from "react";
+import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Environment, Stats } from "@react-three/drei";
 import * as THREE from "three";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
+import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+
+import { useAreaStore } from "@/state/areaStore";
 import { useActionStore } from "@/state/exportStore";
-import { GLTFExporter } from "three/examples/jsm/Addons.js";
+import { useSceneStore } from "@/state/sceneStore";
+import { useSettingsStore } from "@/state/settingsStore";
+import { useAnnotationStore } from "@/state/annotationStore";
+import { toast } from "@/state/toastStore";
+
 import Car from "./Car";
+import { Buildings } from "./Buildings";
+import { Roads } from "./Roads";
+import { Ground } from "./Ground";
+import { Terrain } from "./Terrain";
+import { WaterAndParks } from "./WaterAndParks";
+import { AnimatedWater } from "./AnimatedWater";
+import { Trees } from "./Trees";
+import { StreetLamps } from "./StreetLamps";
+import { Annotations } from "./Annotations";
+import { CameraRig } from "./CameraRig";
+import { SunRig } from "./SunRig";
+import { PostFX } from "./PostFX";
+import { Sky3D } from "./Sky3D";
+import {
+  Boats,
+  Bridges,
+  Crosswalks,
+  OSMTrees,
+  PowerInfra,
+} from "./MapExtras";
+
+import { project } from "@/utils/geo";
+import { useCameraHeading } from "./useCameraHeading";
 import instanceFleet from "@/api/axios";
 
-const scale = 51000;
-
-function Building({
-  shape,
-  extrudeSettings,
-  tags,
-}: {
-  shape: THREE.Shape;
-  extrudeSettings: any;
-  tags: any;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [clicked, setClicked] = useState(false);
-  const [hoverPos, setHoverPos] = useState<THREE.Vector3 | null>(null);
-  const [showTranslations, setShowTranslations] = useState(false);
-  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
-  return (
-    <mesh
-      onPointerOver={(e) => {
-        setHovered(true);
-        e.stopPropagation();
-      }}
-      onPointerOut={(e) => {
-        setHovered(false);
-        e.stopPropagation();
-      }}
-      onPointerMove={(e) => {
-        setHoverPos(e.point.clone());
-        e.stopPropagation();
-      }}
-      onClick={(e) => {
-        setClicked(!clicked);
-        e.stopPropagation();
-      }}
-      rotation={[-Math.PI / 2, 0, 0]}
-      userData={{ exportToGLB: true }}
-    >
-      <extrudeGeometry args={[shape, extrudeSettings]} />
-      <meshStandardMaterial color={hovered || clicked ? "#007bff" : "#9da0a3"} />
-      {(hovered || clicked) && hoverPos && (
-        <Html position={[hoverPos.x, hoverPos.y + extrudeSettings.depth + 0.5, hoverPos.z]} center>
-          <div
-            role="dialog"
-            aria-label={tags.name || "Building Information"}
-            style={{
-              color: "#000000",
-              backgroundColor: "#ffffff96",
-              backdropFilter: "blur(8px)",
-              border: "none",
-              padding: "14px",
-              borderRadius: "10px",
-              fontFamily: "system-ui, -apple-system, sans-serif",
-              fontSize: "13px",
-              width: "200px",
-              boxShadow: "0 2px 14px rgba(0, 0, 0, 0.16)",
-              transition: "all 0.2s ease-in-out",
-            }}
-          >
-            <div
-              style={{
-                fontWeight: "600",
-                fontSize: "15px",
-                borderBottom: tags.name ? "1px solid rgba(0, 0, 0, 0.08)" : "none",
-                paddingBottom: tags.name ? "6px" : "0",
-                marginBottom: tags.name ? "8px" : "4px",
-              }}
-            >
-              {tags.name || "Building Information"}
-            </div>
-            {["building", "height", "building:levels", "amenity", "denomination"].map(
-              (key) =>
-                tags[key] &&
-                (key !== "building" || tags[key] !== "yes") && (
-                  <div
-                    key={key}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      margin: "4px 0",
-                    }}
-                  >
-                    <span style={{ fontWeight: "500", color: "#5f6368" }}>
-                      {key === "building"
-                        ? "Type"
-                        : key === "height"
-                        ? "Height"
-                        : key === "building:levels"
-                        ? "Levels"
-                        : key === "amenity"
-                        ? "Facility"
-                        : key === "denomination"
-                        ? "Denomination"
-                        : key.replace(/_/g, " ")}
-                      :
-                    </span>
-                    <span style={{ textTransform: "capitalize" }}>
-                      {key === "height" ? `${tags[key]} m` : tags[key]}
-                    </span>
-                  </div>
-                )
-            )}
-            {[
-              "addr:street",
-              "addr:housenumber",
-              "addr:district",
-              "addr:city",
-              "addr:postcode",
-            ].some((key) => tags[key]) && (
-              <div
-                style={{
-                  margin: "10px 0 8px",
-                  borderTop: "1px solid rgba(0, 0, 0, 0.08)",
-                  paddingTop: "8px",
-                }}
-              >
-                <div style={{ fontWeight: "500", marginBottom: "4px", color: "#5f6368" }}>
-                  Address
-                </div>
-                <div style={{ marginLeft: "4px", fontSize: "12px", color: "#5f6368" }}>
-                  {[
-                    [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" "),
-                    tags["addr:district"],
-                    tags["addr:city"],
-                    tags["addr:postcode"],
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}
-                </div>
-              </div>
-            )}
-            {Object.entries(tags).filter(
-              ([key]) =>
-                ![
-                  "building",
-                  "name",
-                  "height",
-                  "building:levels",
-                  "source",
-                  "amenity",
-                  "denomination",
-                ].includes(key) &&
-                !key.startsWith("addr:") &&
-                !key.startsWith("name:") &&
-                !key.startsWith("alt_name:")
-            ).length > 0 && (
-              <div
-                style={{
-                  margin: "10px 0 4px",
-                  borderTop: "1px solid rgba(0, 0, 0, 0.08)",
-                  paddingTop: "8px",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: "500",
-                    marginBottom: "4px",
-                    color: "#5f6368",
-                    cursor: "pointer",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                  onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
-                >
-                  Additional Information
-                  <span>{showAdditionalInfo ? "▲" : "▼"}</span>
-                </div>
-                {showAdditionalInfo && (
-                  <div>
-                    {Object.entries(tags)
-                      .filter(
-                        ([key]) =>
-                          ![
-                            "building",
-                            "name",
-                            "height",
-                            "building:levels",
-                            "source",
-                            "amenity",
-                            "denomination",
-                          ].includes(key) &&
-                          !key.startsWith("addr:") &&
-                          !key.startsWith("name:") &&
-                          !key.startsWith("alt_name:")
-                      )
-                      .map(([key, value]) => {
-                        if (
-                          key === "description" ||
-                          (typeof value === "string" && value.length > 80)
-                        ) {
-                          return (
-                            <div key={key} style={{ margin: "8px 0" }}>
-                              <div
-                                style={{ fontWeight: "500", color: "#5f6368", marginBottom: "4px" }}
-                              >
-                                {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ")}
-                              </div>
-                              <div
-                                style={{
-                                  textAlign: "left",
-                                  fontSize: "12px",
-                                  color: "#5f6368",
-                                  fontWeight: "400",
-                                  textWrap: "wrap",
-                                  whiteSpace: "pre-wrap",
-                                  lineHeight: "1.4",
-                                  backgroundColor: "rgba(0,0,0,0.02)",
-                                  padding: "6px 8px",
-                                  borderRadius: "4px",
-                                }}
-                              >
-                                {String(value)}
-                              </div>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div
-                            key={key}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              margin: "4px 0",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontWeight: "700",
-                                color: "#5f6368",
-                                textAlign: "left",
-                              }}
-                            >
-                              {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, " ")}:
-                            </span>
-                            <span
-                              style={{
-                                textTransform: "capitalize",
-                                fontWeight: "400",
-                                textAlign: "right",
-                              }}
-                            >
-                              {String(value)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-            )}
-            {Object.entries(tags).filter(([key]) => key.startsWith("name:")).length > 0 && (
-              <div
-                style={{
-                  margin: "10px 0 4px",
-                  borderTop: "1px solid rgba(0, 0, 0, 0.08)",
-                  paddingTop: "8px",
-                  textAlign: "right",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: "500",
-                    marginBottom: "4px",
-                    color: "#5f6368",
-                    cursor: "pointer",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                  onClick={() => setShowTranslations(!showTranslations)}
-                >
-                  Name Translations
-                  <span>{showTranslations ? "▲" : "▼"}</span>
-                </div>
-                {showTranslations && (
-                  <div>
-                    {Object.entries(tags)
-                      .filter(([key]) => key.startsWith("name:"))
-                      .map(([key, value]) => (
-                        <div
-                          key={key}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            margin: "4px 0",
-                          }}
-                        >
-                          <span style={{ fontWeight: "500", color: "#5f6368" }}>
-                            {key.replace("name:", "").toUpperCase()}:
-                          </span>
-                          <span style={{ textTransform: "capitalize" }}>{String(value)}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </Html>
-      )}
-    </mesh>
-  );
-}
-
-function Roads({ area }: { area: any }) {
-  const [roads, setRoads] = useState<any[]>([]);
-  if (!area || area.length < 2) return null;
-  const refLat = (area[1].lat + area[0].lat) / 2;
-  const refLng = (area[1].lng + area[0].lng) / 2;
-
-  function project(lat: number, lng: number) {
-    const x = (lng - refLng) * scale * Math.cos((refLat * Math.PI) / 180);
-    const y = (lat - refLat) * scale;
-    return new THREE.Vector2(x, y);
-  }
-
-  useEffect(() => {
-    const south = area[1].lat;
-    const west = area[1].lng;
-    const north = area[0].lat;
-    const east = area[0].lng;
-    const query = `[out:json][timeout:25];(way["highway"](${south},${west},${north},${east}););out body geom;`;
-    fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: query,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setRoads(data.elements);
-      })
-      .catch((err) => console.error(err));
-  }, [area]);
-
-  return (
-    <>
-      {roads.map((road, index) => {
-        if (!road.geometry || road.geometry.length < 2) return null;
-
-        const points = road.geometry.map((pt: any) => {
-          const v = project(pt.lat, pt.lon);
-          return new THREE.Vector3(v.x, 0.1, -v.y);
-        });
-
-        const lineGeometry: any = new THREE.BufferGeometry().setFromPoints(points);
-
-        return (
-          <Line
-            points={points}
-            color="#34f516"
-            lineWidth={1}
-            userData={{ exportToGLB: true }}
-          ></Line>
-        );
-      })}
-    </>
-  );
-}
-
-export function Export() {
+// ─── Export bridge ──────────────────────────────────────────────────────
+function Exporter() {
   const { scene } = useThree();
-  const action = useActionStore((state) => state.action);
-  const fleetSpaceId = useActionStore((state) => state.fleetSpaceId);
-
-  const exportType = useActionStore((state) => state.exportType);
-
-  const setAction = useActionStore((state) => state.setAction);
+  const action = useActionStore((s) => s.action);
+  const setAction = useActionStore((s) => s.setAction);
+  const fleetSpaceId = useActionStore((s) => s.fleetSpaceId);
+  const exportType = useActionStore((s) => s.exportType);
+  const exportFormat = useActionStore((s) => s.exportFormat);
 
   useEffect(() => {
-    if (action === true) {
-      setAction(false);
-      exportGLB();
-    }
-  }, [action, setAction, scene]);
+    if (!action) return;
+    setAction(false);
 
-  const uploadFleet = async (blob) => {
-    const formData = new FormData();
-
-    formData.append("object", blob, "box3d.glb");
-    formData.append("title", "New Object");
-    formData.append("description", "");
-    formData.append("spaceId", fleetSpaceId);
-
-    await instanceFleet.post("space/file/mesh", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-  };
-
-  const exportGLB = () => {
     const exportRoot = new THREE.Group();
     scene.traverse((child) => {
       if (child.userData?.exportToGLB === true) {
         exportRoot.add(child.clone(true));
       }
     });
+
+    if (exportFormat === "obj") {
+      const text = new OBJExporter().parse(exportRoot);
+      downloadText(text, "map3d-scene.obj", "text/plain");
+      toast.success("OBJ downloaded");
+      return;
+    }
+    if ((exportFormat as string) === "stl") {
+      const text = new STLExporter().parse(exportRoot);
+      downloadText(text, "map3d-scene.stl", "model/stl");
+      toast.success("STL downloaded");
+      return;
+    }
+
     const exporter = new GLTFExporter();
-    const options = { binary: true, embedImages: true };
     exporter.parse(
       exportRoot,
       (result) => {
-        if (result instanceof ArrayBuffer) {
-          const blob = new Blob([result], { type: "model/gltf-binary" });
-
-          if (exportType == "glb") {
-            const link = document.createElement("a");
-            link.style.display = "none";
-            document.body.appendChild(link);
-            link.href = URL.createObjectURL(blob);
-            link.download = "scene.glb";
-            link.click();
-            document.body.removeChild(link);
-          }
-
-          if (exportType == "fleet") {
-            uploadFleet(blob);
-          }
-        } else {
-          console.error("GLB export failed: unexpected result", result);
+        if (!(result instanceof ArrayBuffer)) {
+          toast.error("Export failed: unexpected result");
+          return;
+        }
+        const blob = new Blob([result], { type: "model/gltf-binary" });
+        if (exportType === "glb") {
+          downloadBlob(blob, "map3d-scene.glb");
+          toast.success("GLB downloaded");
+        } else if (exportType === "fleet") {
+          uploadFleet(blob, fleetSpaceId).then(
+            () => toast.success("Uploaded to Fleet"),
+            () => toast.error("Fleet upload failed")
+          );
         }
       },
-      (error) => {
-        console.error("An error occurred during export", error);
-      },
-      options
+      () => toast.error("Export failed"),
+      { binary: true, embedImages: true }
     );
-  };
+  }, [action, exportFormat, exportType, fleetSpaceId, scene, setAction]);
+
   return null;
 }
 
-export function Space() {
-  const areas = useAreaStore((state) => state.areas);
-  const [realCenter, setRealCenter] = useState<any>();
-  const center = useAreaStore((state) => state.center);
-  const refLat = (center[1].lat + center[0].lat) / 2;
-  const refLng = (center[1].lng + center[0].lng) / 2;
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.style.display = "none";
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function downloadText(text: string, filename: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  downloadBlob(blob, filename);
+}
 
-  function project(lat: number, lng: number) {
-    const x = (lng - refLng) * scale * Math.cos((refLat * Math.PI) / 180);
-    const y = (lat - refLat) * scale;
-    return new THREE.Vector2(x, y);
-  }
+async function uploadFleet(blob: Blob, spaceId: string) {
+  const formData = new FormData();
+  formData.append("object", blob, "box3d.glb");
+  formData.append("title", "New Object");
+  formData.append("description", "");
+  formData.append("spaceId", spaceId);
+  await instanceFleet.post("space/file/mesh", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+}
 
-  const areaData = () => {
-    const result: Array<{
-      shape: THREE.Shape;
-      extrudeSettings: any;
-      tags: any;
-    }> = [];
-    areas.forEach((bld: any) => {
-      if (!bld.geometry || bld.geometry.length < 3) return;
-      const shapePoints = bld.geometry.map((pt: any) => project(pt.lat, pt.lng));
-      if (!shapePoints[0].equals(shapePoints[shapePoints.length - 1]))
-        shapePoints.push(shapePoints[0]);
-      const shape = new THREE.Shape(shapePoints);
-      let heightValue = parseFloat(bld.tags.height || "");
-      const heightLevels = parseFloat(bld.tags["building:levels"] || "");
-      if (isNaN(heightValue)) heightValue = 10;
-      if (!isNaN(heightLevels)) heightValue = heightLevels * 2.2;
-      const extrudeSettings = {
-        steps: 1,
-        depth: heightValue,
-        bevelEnabled: false,
-      };
-      result.push({ shape, extrudeSettings, tags: bld.tags });
-    });
-    return result;
-  };
+// ─── Screenshot bridge ──────────────────────────────────────────────────
+function Screenshotter() {
+  const { gl, scene, camera } = useThree();
+  const wantsScreenshot = useActionStore((s) => s.screenshotRequest);
+  const clearScreenshot = useActionStore((s) => s.setScreenshotRequest);
 
   useEffect(() => {
-    setRealCenter(center);
-  }, [areas]);
+    if (!wantsScreenshot) return;
+    gl.render(scene, camera);
+    const dataUrl = gl.domElement.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `map3d-${Date.now()}.png`;
+    a.click();
+    clearScreenshot(false);
+    toast.success("Screenshot saved");
+  }, [wantsScreenshot, clearScreenshot, gl, scene, camera]);
 
-  const buildingsData = areaData();
+  return null;
+}
+
+function HeadingTracker() {
+  useCameraHeading();
+  return null;
+}
+
+function PinDropTarget() {
+  const add = useAnnotationStore((s) => s.add);
+  return (
+    <mesh
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, 0.01, 0]}
+      onClick={(e: ThreeEvent<MouseEvent>) => {
+        if (!e.shiftKey) return;
+        e.stopPropagation();
+        const label = window.prompt("Pin label:", "Place");
+        if (label) {
+          add({
+            worldX: e.point.x,
+            worldY: e.point.y,
+            worldZ: e.point.z,
+            label,
+          });
+        }
+      }}
+    >
+      <planeGeometry args={[4000, 4000]} />
+      <meshBasicMaterial visible={false} />
+    </mesh>
+  );
+}
+
+// ─── Main Space ─────────────────────────────────────────────────────────
+export function Space() {
+  const areas = useAreaStore((s) => s.areas);
+  const center = useAreaStore((s) => s.center);
+  const shadowsEnabled = useSceneStore((s) => s.shadowsEnabled);
+  const timeOfDay = useSceneStore((s) => s.timeOfDay);
+  const showFPS = useSettingsStore((s) => s.showFPS);
+
+  const [areaSnapshot, setAreaSnapshot] = useState(center);
+  useEffect(() => setAreaSnapshot(center), [areas, center]);
+
+  const ref = useMemo(
+    () => ({
+      lat: (center[0].lat + center[1].lat) / 2,
+      lng: (center[0].lng + center[1].lng) / 2,
+    }),
+    [center]
+  );
+
+  const isNight = timeOfDay === "night";
 
   return (
-    <Canvas camera={{ fov: 90, near: 0.1, far: 7000 }}>
-      <ambientLight intensity={Math.PI / 2} />
-      <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} decay={0} intensity={Math.PI} />
-      {buildingsData.map((item, index) => (
-        <Building
-          key={index}
-          shape={item.shape}
-          extrudeSettings={item.extrudeSettings}
-          tags={item.tags}
-        />
-      ))}
+    <Canvas
+      camera={{ fov: 75, near: 0.1, far: 7000, position: [0, 80, 120] }}
+      shadows={shadowsEnabled}
+      dpr={[1, 2]}
+      gl={{ antialias: true, preserveDrawingBuffer: true }}
+    >
+      <color attach="background" args={[isNight ? "#06081a" : "#dfe9f3"]} />
+      <fog
+        attach="fog"
+        args={[isNight ? "#06081a" : "#cdd9e6", 250, 1800]}
+      />
 
-      <Roads area={realCenter} />
-      <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
+      <SunRig />
+      <Sky3D />
+
+      <Environment preset={isNight ? "night" : "city"} />
+
+      <Terrain ref={ref} />
+      <Ground ref={ref} />
+      <WaterAndParks corners={areaSnapshot} ref={ref} />
+      <AnimatedWater corners={areaSnapshot} ref={ref} />
+      <Boats corners={areaSnapshot} ref={ref} />
+      <Roads corners={areaSnapshot} ref={ref} />
+      <Bridges corners={areaSnapshot} ref={ref} />
+      <Crosswalks corners={areaSnapshot} ref={ref} />
+      <PowerInfra corners={areaSnapshot} ref={ref} />
+      <Buildings buildings={areas} ref={ref} />
+      <Trees corners={areaSnapshot} ref={ref} />
+      <OSMTrees corners={areaSnapshot} ref={ref} />
+      <StreetLamps corners={areaSnapshot} ref={ref} />
+      <Annotations />
+
+      <PinDropTarget />
       <Car />
-      <Export />
-      <Sky distance={450000} sunPosition={[0, 1, 0]} inclination={0} azimuth={0.25} />
-      <Environment preset="city" />
+      <CameraRig />
+      <HeadingTracker />
+
+      <Exporter />
+      <Screenshotter />
+
+      <PostFX />
+
+      {showFPS && <Stats />}
     </Canvas>
   );
 }
+
+export { project };

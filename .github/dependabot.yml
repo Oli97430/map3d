@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      three-ecosystem:
+        patterns:
+          - "three"
+          - "@types/three"
+          - "@react-three/*"
+          - "postprocessing"
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "@playwright/test"
+          - "jsdom"
+      linting:
+        patterns:
+          - "eslint*"
+          - "typescript-eslint"
+          - "prettier"
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

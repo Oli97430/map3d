@@ -1,19 +1,32 @@
 import { create } from "zustand";
 
-type ActionStore = {
+export type ExportType = "glb" | "fleet";
+export type ExportFormat = "glb" | "gltf" | "obj" | "stl";
+
+interface ActionStore {
+  // Export trigger
   action: boolean;
+  exportType: ExportType;
+  exportFormat: ExportFormat;
   fleetSpaceId: string;
-  exportType: "glb" | "fleet";
+
+  // Screenshot
+  screenshotRequest: boolean;
 
   setAction: (action: boolean) => void;
-  setFleet: (fleetSpaceId: string, exportType: "glb" | "fleet") => void;
-};
+  setFleet: (fleetSpaceId: string, exportType: ExportType) => void;
+  setExportFormat: (format: ExportFormat) => void;
+  setScreenshotRequest: (v: boolean) => void;
+}
 
 export const useActionStore = create<ActionStore>((set) => ({
   action: false,
-  fleetSpaceId: "",
   exportType: "glb",
-  setAction: (action) => set(() => ({ action: action })),
-  setFleet: (fleetSpaceId, exportType) =>
-    set(() => ({ fleetSpaceId: fleetSpaceId, exportType: exportType })),
+  exportFormat: "glb",
+  fleetSpaceId: "",
+  screenshotRequest: false,
+  setAction: (action) => set({ action }),
+  setFleet: (fleetSpaceId, exportType) => set({ fleetSpaceId, exportType }),
+  setExportFormat: (exportFormat) => set({ exportFormat }),
+  setScreenshotRequest: (v) => set({ screenshotRequest: v }),
 }));

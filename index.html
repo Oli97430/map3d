@@ -1,12 +1,212 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>map3d</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#6366f1" />
+    <meta
+      name="description"
+      content="Map3D — Generate 3D maps from real-world OpenStreetMap data and export them as GLB, OBJ, or STL files."
+    />
+    <meta name="keywords" content="3D map, OpenStreetMap, GLB, Three.js, Blender, glTF, OBJ, STL, city, building, 3D model" />
+    <meta name="author" content="cartesiancs" />
+
+    <meta property="og:title" content="Map3D — Generate 3D maps" />
+    <meta
+      property="og:description"
+      content="Select an area on the map and export it as a 3D GLB scene."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://map.fleet.im/" />
+    <meta property="og:image" content="https://map.fleet.im/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Map3D — Generate 3D maps" />
+    <meta name="twitter:description" content="Generate 3D maps from OpenStreetMap and export them as GLB." />
+    <meta name="twitter:image" content="https://map.fleet.im/og-image.png" />
+
+    <link rel="canonical" href="https://map.fleet.im/" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236366f1'/><stop offset='1' stop-color='%238b5cf6'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><path d='M14 42 L26 22 L38 36 L50 18' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/><circle cx='14' cy='42' r='3' fill='white'/><circle cx='50' cy='18' r='3' fill='white'/></svg>"
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Map3D",
+        "url": "https://map.fleet.im/",
+        "description": "Generate 3D maps from real-world OpenStreetMap data and export them as GLB / OBJ / STL files.",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Web",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "creator": {
+          "@type": "Organization",
+          "name": "cartesiancs",
+          "url": "https://github.com/cartesiancs"
+        }
+      }
+    </script>
+
+    <title>Map3D — Generate 3D maps</title>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #f1f5f9;
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          system-ui,
+          sans-serif;
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background:
+          radial-gradient(
+            1200px 600px at 20% 0%,
+            rgba(99, 102, 241, 0.12),
+            transparent 60%
+          ),
+          radial-gradient(
+            1000px 500px at 90% 100%,
+            rgba(139, 92, 246, 0.1),
+            transparent 60%
+          ),
+          #f1f5f9;
+        z-index: 99999;
+        transition: opacity 0.5s ease;
+      }
+      #splash.fade {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+        animation: splash-bounce 1.4s ease-in-out infinite;
+      }
+      .splash-logo svg {
+        width: 36px;
+        height: 36px;
+        color: #fff;
+      }
+      .splash-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: #475569;
+        letter-spacing: -0.01em;
+      }
+      .splash-dots {
+        display: flex;
+        gap: 6px;
+      }
+      .splash-dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #6366f1;
+        animation: splash-dot 1.2s ease-in-out infinite;
+      }
+      .splash-dots span:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .splash-dots span:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes splash-bounce {
+        0%,
+        100% {
+          transform: translateY(0) scale(1);
+        }
+        50% {
+          transform: translateY(-8px) scale(1.04);
+        }
+      }
+      @keyframes splash-dot {
+        0%,
+        100% {
+          opacity: 0.3;
+          transform: scale(0.8);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.15);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .splash-logo,
+        .splash-dots span {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <div class="splash-logo" role="img" aria-label="Map3D">
+        <svg
+          viewBox="0 0 64 64"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M14 42 L26 22 L38 36 L50 18" />
+          <circle cx="14" cy="42" r="3" fill="currentColor" />
+          <circle cx="50" cy="18" r="3" fill="currentColor" />
+        </svg>
+      </div>
+      <div class="splash-text">Loading Map3D…</div>
+      <div class="splash-dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      window.addEventListener("load", function () {
+        var observer = new MutationObserver(function () {
+          if (document.getElementById("root").childNodes.length > 0) {
+            var s = document.getElementById("splash");
+            if (s) {
+              s.classList.add("fade");
+              setTimeout(function () {
+                s.parentNode && s.parentNode.removeChild(s);
+              }, 600);
+            }
+            observer.disconnect();
+          }
+        });
+        observer.observe(document.getElementById("root"), { childList: true });
+      });
+    </script>
   </body>
 </html>

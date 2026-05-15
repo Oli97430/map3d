@@ -1,145 +1,316 @@
-import { useCarStore } from "@/state/carStore";
 import { css } from "@emotion/react";
-import { DetailedHTMLProps, ButtonHTMLAttributes, useState } from "react";
-import { Modal } from "../modal/Modal";
-import { Column } from "../flex/Column";
-import { Title } from "../text/Title";
-import { Description } from "../text/Description";
+import { DetailedHTMLProps, ButtonHTMLAttributes } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  Github,
+  Settings,
+  Car as CarIcon,
+  MapPinned,
+  Keyboard,
+  Camera,
+  Share2,
+} from "lucide-react";
+import { useCarStore } from "@/state/carStore";
+import { useActionStore } from "@/state/exportStore";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import { toast } from "@/state/toastStore";
+import { Tooltip } from "@/components/Tooltip";
+import {
+  BORDER_COLOR,
+  BRAND_GRADIENT,
+  SHADOW_SM,
+  SUBTITLE_COLOR,
+  SURFACE_GLASS,
+  SURFACE_GLASS_HOVER,
+} from "@/theme/color";
 
-const TOP_PANEL_HEIGHT = "3rem";
-const BORDER_COLOR = "#ededf290";
-
+const TOP_PANEL_HEIGHT = "3.25rem";
 const breakpoints = [768];
 const mq = breakpoints.map((bp) => `@media (max-width: ${bp}px)`);
 
-interface ButtonProps
-  extends DetailedHTMLProps<
-    ButtonHTMLAttributes<HTMLButtonElement>,
-    HTMLButtonElement
-  > {
+interface ButtonProps extends DetailedHTMLProps<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  HTMLButtonElement
+> {
   isShow?: boolean;
+  isActive?: boolean;
 }
 
-export function TopNav({ step }: { step: number }) {
-  const setThirdMode = useCarStore((state) => state.setThirdMode);
-  const thirdMode = useCarStore((state) => state.thirdMode);
-  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+function Stepper({ step }: { step: number }) {
+  const { t } = useTranslation();
+  const labels = [
+    t("steps.selectArea"),
+    t("steps.buildings"),
+    t("steps.scene"),
+  ];
+  return (
+    <div
+      css={css({
+        display: "flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        [mq[0]]: { display: "none" },
+      })}
+    >
+      {labels.map((label, idx) => {
+        const isActive = idx === step;
+        const isDone = idx < step;
+        return (
+          <div
+            key={label}
+            css={css({
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+            })}
+          >
+            <div
+              css={css({
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.3rem 0.7rem",
+                borderRadius: "999px",
+                fontSize: "12px",
+                fontWeight: 500,
+                transition: "all 0.2s ease",
+                background: isActive
+                  ? BRAND_GRADIENT
+                  : isDone
+                    ? "rgba(99, 102, 241, 0.1)"
+                    : "transparent",
+                color: isActive ? "#ffffff" : isDone ? "#6366f1" : "#94a3b8",
+              })}
+            >
+              <span
+                css={css({
+                  display: "inline-flex",
+                  width: "16px",
+                  height: "16px",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  borderRadius: "50%",
+                  background: isActive
+                    ? "rgba(255,255,255,0.25)"
+                    : isDone
+                      ? "#6366f1"
+                      : "rgba(148, 163, 184, 0.2)",
+                  color: isActive || isDone ? "#ffffff" : "#94a3b8",
+                })}
+              >
+                {idx + 1}
+              </span>
+              {label}
+            </div>
+            {idx < labels.length - 1 && (
+              <span
+                css={css({
+                  width: "14px",
+                  height: "1px",
+                  background:
+                    idx < step ? "#6366f1" : "rgba(148, 163, 184, 0.4)",
+                })}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-  const [openModal, setOpenModal] = useState(false);
+async function copyShareLink() {
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    toast.success("Link copied to clipboard");
+  } catch {
+    toast.error("Could not copy link");
+  }
+}
+
+export function TopNav({
+  step,
+  onOpenOptions,
+  onOpenShortcuts,
+}: {
+  step: number;
+  onOpenOptions: () => void;
+  onOpenShortcuts: () => void;
+}) {
+  const { t } = useTranslation();
+  const setThirdMode = useCarStore((s) => s.setThirdMode);
+  const thirdMode = useCarStore((s) => s.thirdMode);
+  const setScreenshot = useActionStore((s) => s.setScreenshotRequest);
+  const isMobile = useIsMobile();
 
   return (
-    <>
+    <div
+      css={css({
+        display: "flex",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: TOP_PANEL_HEIGHT,
+        backgroundColor: SURFACE_GLASS,
+        backdropFilter: "blur(16px) saturate(180%)",
+        WebkitBackdropFilter: "blur(16px) saturate(180%)",
+        borderBottom: `1px solid ${BORDER_COLOR}`,
+        boxShadow: SHADOW_SM,
+        zIndex: 9999,
+        justifyContent: "space-between",
+        alignItems: "center",
+        transition: "all 0.3s ease",
+      })}
+    >
       <div
         css={css({
-          display: "flex",
-          transition: ".5s",
-          transform: "translate(0px, 0px)",
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: TOP_PANEL_HEIGHT,
-          backgroundColor: "#ffffff50",
-          backdropFilter: "blur(12px)",
-          borderBottom: `1px solid ${BORDER_COLOR}`,
-          zIndex: 9999,
-          justifyContent: "space-between",
+          paddingLeft: "1.5rem",
           alignItems: "center",
+          display: "flex",
+          gap: "0.6rem",
         })}
       >
         <div
           css={css({
-            paddingLeft: "2rem",
+            width: "26px",
+            height: "26px",
+            borderRadius: "8px",
+            background: BRAND_GRADIENT,
+            display: "flex",
             alignItems: "center",
-            flexDirection: "row",
-            display: "flex",
-            gap: "0.75rem",
+            justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(99, 102, 241, 0.35)",
           })}
         >
-          <span
-            css={css({
-              fontSize: "14px",
-              fontWeight: "600",
-              color: "#5b5d63",
-            })}
-          >
-            🗺️ Map3d
-          </span>
+          <MapPinned size={15} color="#fff" strokeWidth={2.5} />
         </div>
-
-        <div
+        <span
           css={css({
-            padding: "0rem 0rem",
-            [mq[0]]: {
-              display: "none",
-            },
-          })}
-        ></div>
-
-        <div
-          css={css({
-            paddingRight: "2rem",
-            display: "flex",
-            flexDirection: "row",
-            gap: "0.5rem",
+            fontSize: "15px",
+            fontWeight: 700,
+            color: SUBTITLE_COLOR,
+            letterSpacing: "-0.01em",
           })}
         >
-          <NavButton
-            isShow={true}
-            onClick={() => window.open("https://github.com/cartesiancs/map3d")}
-          >
-            GitHub
-          </NavButton>
-          <NavButton isShow={step >= 1} onClick={() => setOpenModal(true)}>
-            Options
-          </NavButton>
-
-          {!isMobile && (
-            <>
-              {thirdMode ? (
-                <NavButton
-                  isShow={step == 2}
-                  onClick={() => setThirdMode(false)}
-                >
-                  Disable Car
-                </NavButton>
-              ) : (
-                <NavButton
-                  isShow={step == 2}
-                  onClick={() => setThirdMode(true)}
-                >
-                  Car Mode
-                </NavButton>
-              )}
-            </>
-          )}
-        </div>
+          {t("app.title")}
+        </span>
       </div>
 
-      <Modal isOpen={openModal} onClose={() => setOpenModal(false)}>
-        <Column gap="0.5rem">
-          <Title>Options </Title>
-        </Column>
-      </Modal>
-    </>
+      <Stepper step={step} />
+
+      <div
+        css={css({
+          paddingRight: "1.5rem",
+          display: "flex",
+          flexDirection: "row",
+          gap: "0.5rem",
+          alignItems: "center",
+        })}
+      >
+        {step === 0 && (
+          <Tooltip label="Share map link">
+            <NavButton
+              isShow
+              onClick={copyShareLink}
+              aria-label="Share map link"
+            >
+              <Share2 size={13} strokeWidth={2} />
+            </NavButton>
+          </Tooltip>
+        )}
+        {step === 2 && (
+          <Tooltip label="Screenshot (P)">
+            <NavButton
+              isShow
+              onClick={() => setScreenshot(true)}
+              aria-label="Take screenshot"
+            >
+              <Camera size={13} strokeWidth={2} />
+              <span css={css({ [mq[0]]: { display: "none" } })}>
+                Screenshot
+              </span>
+            </NavButton>
+          </Tooltip>
+        )}
+        <Tooltip label={t("nav.options")}>
+          <NavButton
+            isShow={step >= 1}
+            onClick={onOpenOptions}
+            aria-label={t("nav.options")}
+          >
+            <Settings size={13} strokeWidth={2} />
+            <span css={css({ [mq[0]]: { display: "none" } })}>
+              {t("nav.options")}
+            </span>
+          </NavButton>
+        </Tooltip>
+        <Tooltip label={`${t("shortcuts.title")} (?)`}>
+          <NavButton
+            isShow
+            onClick={onOpenShortcuts}
+            aria-label={t("shortcuts.title")}
+          >
+            <Keyboard size={13} strokeWidth={2} />
+          </NavButton>
+        </Tooltip>
+        <Tooltip label={t("nav.github")}>
+          <NavButton
+            isShow
+            onClick={() => window.open("https://github.com/cartesiancs/map3d")}
+            aria-label={t("nav.github")}
+          >
+            <Github size={13} strokeWidth={2} />
+            <span css={css({ [mq[0]]: { display: "none" } })}>
+              {t("nav.github")}
+            </span>
+          </NavButton>
+        </Tooltip>
+
+        {!isMobile && step === 2 && (
+          <NavButton
+            isShow
+            isActive={thirdMode}
+            onClick={() => setThirdMode(!thirdMode)}
+          >
+            <CarIcon size={13} strokeWidth={2} />
+            {thirdMode ? t("nav.exitCar") : t("nav.carMode")}
+          </NavButton>
+        )}
+      </div>
+    </div>
   );
 }
 
-export function NavButton(props: ButtonProps) {
+export function NavButton({ isActive, isShow, ...props }: ButtonProps) {
+  if (isShow === false) return null;
   return (
     <button
       css={css({
-        color: "#000000",
-        backgroundColor: "#ffffff96",
+        color: isActive ? "#ffffff" : "#0f172a",
+        background: isActive ? BRAND_GRADIENT : SURFACE_GLASS,
         backdropFilter: "blur(8px)",
-        border: "none",
-        padding: "0.5rem 1rem",
+        border: `1px solid ${isActive ? "transparent" : BORDER_COLOR}`,
+        padding: "0.4rem 0.85rem",
         borderRadius: "8px",
-        fontWeight: "300",
+        fontWeight: 500,
         fontSize: "12px",
-        outline: "rgba(240, 240, 244, 0.51) solid 0.1rem",
-        display: props.isShow ? "" : "none",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "0.4rem",
         cursor: "pointer",
+        transition: "all 0.18s ease",
+        boxShadow: isActive ? "0 2px 8px rgba(99,102,241,0.3)" : "none",
+        ":hover": {
+          backgroundColor: isActive ? undefined : SURFACE_GLASS_HOVER,
+          transform: "translateY(-1px)",
+          boxShadow: isActive
+            ? "0 4px 12px rgba(99,102,241,0.4)"
+            : "0 2px 6px rgba(15,23,42,0.08)",
+        },
+        ":active": { transform: "translateY(0)" },
       })}
       {...props}
     >

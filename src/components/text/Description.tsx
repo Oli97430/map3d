@@ -7,8 +7,10 @@ export function Description({ children }: { children?: React.ReactNode }) {
       css={css({
         margin: 0,
         color: DESC_COLOR,
-        fontSize: "1rem",
-        fontWeight: "400",
+        fontSize: "0.95rem",
+        fontWeight: 400,
+        lineHeight: 1.55,
+        maxWidth: "640px",
       })}
     >
       {children}
